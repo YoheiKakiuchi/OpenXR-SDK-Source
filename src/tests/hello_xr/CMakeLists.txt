@@ -15,6 +15,11 @@
 # limitations under the License.
 #
 
+if(NOT XR_USE_GRAPHICS_API_OPENGL)
+    message(STATUS "Skipping hello_xr: OpenGL graphics support is unavailable")
+    return()
+endif()
+
 set(LOCAL_HEADERS
     check.h
     common.h
@@ -30,6 +35,7 @@ set(LOCAL_HEADERS
 )
 set(LOCAL_SOURCE
     graphicsplugin_factory.cpp
+    graphicsplugin_opengl.cpp
     logger.cpp
     main.cpp
     openxr_program.cpp
@@ -37,88 +43,14 @@ set(LOCAL_SOURCE
     swapchain_image_data.cpp
 )
 
-if(ANDROID)
-    list(APPEND LOCAL_SOURCE platformplugin_android.cpp)
-elseif(WIN32)
+if(WIN32)
     list(APPEND LOCAL_SOURCE platformplugin_win32.cpp)
 else()
     list(APPEND LOCAL_SOURCE platformplugin_posix.cpp)
 endif()
 
-if(XR_USE_GRAPHICS_API_D3D11 OR XR_USE_GRAPHICS_API_D3D12)
-    list(APPEND LOCAL_SOURCE d3d_common.cpp)
-    list(APPEND LOCAL_HEADERS d3d_common.h)
-endif()
-if(XR_USE_GRAPHICS_API_D3D11)
-    list(APPEND LOCAL_SOURCE graphicsplugin_d3d11.cpp)
-endif()
-if(XR_USE_GRAPHICS_API_D3D12)
-    list(APPEND LOCAL_SOURCE d3d12_utils.cpp graphicsplugin_d3d12.cpp)
-    list(APPEND LOCAL_HEADERS d3d12_utils.h)
-endif()
-if(XR_USE_GRAPHICS_API_OPENGL)
-    list(APPEND LOCAL_SOURCE graphicsplugin_opengl.cpp)
-endif()
-if(XR_USE_GRAPHICS_API_OPENGL_ES)
-    list(APPEND LOCAL_SOURCE graphicsplugin_opengles.cpp)
-endif()
-set(VULKAN_SHADERS)
-if(XR_USE_GRAPHICS_API_VULKAN)
-    list(APPEND LOCAL_SOURCE graphicsplugin_vulkan.cpp)
-    list(APPEND LOCAL_HEADERS vulkan_utils.h)
-    set(VULKAN_SHADERS vulkan_shaders/frag.glsl vulkan_shaders/vert.glsl)
-endif()
-if(XR_USE_GRAPHICS_API_METAL)
-    list(APPEND LOCAL_SOURCE graphicsplugin_metal.cpp)
-endif()
-
-if(ANDROID)
-    add_library(
-        hello_xr MODULE
-        ${LOCAL_SOURCE}
-        ${LOCAL_HEADERS}
-        ${VULKAN_SHADERS}
-        $<TARGET_OBJECTS:android_native_app_glue>
-    )
-    target_link_libraries(
-        hello_xr PRIVATE ${ANDROID_LIBRARY} ${ANDROID_LOG_LIBRARY}
-    )
-
-    # Only for Android because it lacks a command line
-    set(HELLOXR_DEFAULT_GRAPHICS_PLUGIN
-        "OpenGLES"
-        CACHE
-            STRING
-            "Which graphics plugin should be used by default for Hello XR artifacts?"
-    )
-    # These are the recognized options: provide them as a helper in the CMake GUI
-    set_property(
-        CACHE HELLOXR_DEFAULT_GRAPHICS_PLUGIN PROPERTY STRINGS "OpenGLES"
-                                                       "Vulkan"
-    )
-
-    # Now handle the value, normally provided by Gradle
-    if(HELLOXR_DEFAULT_GRAPHICS_PLUGIN STREQUAL "OpenGLES")
-        message(STATUS "hello_xr will default to OpenGL ES graphics plugin")
-        target_compile_definitions(
-            hello_xr PRIVATE DEFAULT_GRAPHICS_PLUGIN_OPENGLES
-        )
-    elseif(HELLOXR_DEFAULT_GRAPHICS_PLUGIN STREQUAL "Vulkan")
-        message(STATUS "hello_xr will default to Vulkan graphics plugin")
-        target_compile_definitions(
-            hello_xr PRIVATE DEFAULT_GRAPHICS_PLUGIN_VULKAN
-        )
-    endif()
-
-else()
-    add_executable(hello_xr ${LOCAL_SOURCE} ${LOCAL_HEADERS} ${VULKAN_SHADERS})
-    add_sanitizers(hello_xr)
-endif()
-
-if(XR_USE_GRAPHICS_API_METAL)
-    # use C++17 since there is a dependency on metal-cpp
-    target_compile_features(hello_xr PUBLIC cxx_std_17)
-endif()
+add_executable(hello_xr ${LOCAL_SOURCE} ${LOCAL_HEADERS})
+add_sanitizers(hello_xr)
 
 set_target_properties(hello_xr PROPERTIES FOLDER ${SAMPLES_FOLDER})
 source_group("Headers" FILES ${LOCAL_HEADERS})
@@ -133,24 +65,6 @@ target_include_directories(
         # Backport of std::span functionality to pre-C++17
         ${PROJECT_SOURCE_DIR}/src/external/span-lite/include
 )
-
-if(XR_USE_GRAPHICS_API_METAL)
-    target_include_directories(hello_xr PRIVATE "${PROJECT_SOURCE_DIR}/src/external/metal-cpp")
-endif()
-
-if(XR_USE_GRAPHICS_API_VULKAN)
-    source_group("Shaders" FILES ${VULKAN_SHADERS})
-    target_include_directories(hello_xr PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
-    compile_glsl(run_hello_xr_glsl_compiles ${VULKAN_SHADERS})
-    add_dependencies(hello_xr run_hello_xr_glsl_compiles)
-
-    if(GLSLANG_VALIDATOR AND NOT GLSLC_COMMAND)
-        target_compile_definitions(hello_xr PRIVATE USE_GLSLANGVALIDATOR)
-    endif()
-
-    target_include_directories(hello_xr PRIVATE ${Vulkan_INCLUDE_DIRS})
-    target_link_libraries(hello_xr PRIVATE ${Vulkan_LIBRARY})
-endif()
 
 if(TARGET openxr-gfxwrapper)
     target_link_libraries(hello_xr PRIVATE openxr-gfxwrapper)
@@ -169,32 +83,17 @@ if(WIN32)
             target_compile_options(openxr_c_compile_test PRIVATE /WX)
         endif()
 
-        if(XR_USE_GRAPHICS_API_D3D11)
-            target_link_libraries(hello_xr PRIVATE d3d11 d3dcompiler dxgi)
-        endif()
-        if(XR_USE_GRAPHICS_API_D3D12)
-            target_link_libraries(hello_xr PRIVATE d3d12 d3dcompiler dxgi)
-        endif()
     endif()
 endif()
 
-if(XR_USE_GRAPHICS_API_METAL)
-    target_link_libraries(
-        hello_xr PRIVATE "-framework Foundation" "-framework CoreGraphics"
-                         "-framework Metal"
-    )
-endif()
-
-if(NOT ANDROID)
+install(
+    TARGETS hello_xr RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+                             COMPONENT hello_xr
+)
+if(NOT WIN32)
     install(
-        TARGETS hello_xr RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-                                 COMPONENT hello_xr
+        FILES hello_xr.1
+        DESTINATION ${CMAKE_INSTALL_MANDIR}/man1/
+        COMPONENT ManPages
     )
-    if(NOT WIN32)
-        install(
-            FILES hello_xr.1
-            DESTINATION ${CMAKE_INSTALL_MANDIR}/man1/
-            COMPONENT ManPages
-        )
-    endif()
 endif()
