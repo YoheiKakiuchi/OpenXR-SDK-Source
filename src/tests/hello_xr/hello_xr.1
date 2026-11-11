@@ -23,6 +23,10 @@ is a sample application written using the
 .Tn OpenXR
 API.
 .Pp
+The application does not submit a composition layer. It logs the headset pose,
+left and right controller poses, and the mapped grab and button states on each
+frame. A graphics API is still required to create the OpenXR session.
+.Pp
 The arguments are as follows:
 .Bl -tag -width -indent
 .It Fl h | Fl -help

@@ -40,16 +40,6 @@ inline XrEnvironmentBlendMode GetXrEnvironmentBlendMode(const std::string& envir
     throw std::invalid_argument(Fmt("Unknown environment blend mode '%s'", environmentBlendModeStr.c_str()));
 }
 
-inline std::string GetOpenXrProgram(const std::string& openxrProgramStr) {
-    if (EqualsIgnoreCase(openxrProgramStr, "Default")) {
-        return "Default";
-    }
-    if (EqualsIgnoreCase(openxrProgramStr, "SpatialContainers")) {
-        return "SpatialContainers";
-    }
-    throw std::invalid_argument(Fmt("Unknown OpenXR program '%s'", openxrProgramStr.c_str()));
-}
-
 struct Options {
     std::string GraphicsPlugin;
 
@@ -61,8 +51,6 @@ struct Options {
 
     std::string AppSpace{"Local"};
 
-    std::string OpenXrProgram{"Default"};
-
     struct {
         XrFormFactor FormFactor{XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY};
 
@@ -73,7 +61,6 @@ struct Options {
     } Parsed;
 
     void ParseStrings() {
-        OpenXrProgram = GetOpenXrProgram(OpenXrProgram);
         Parsed.FormFactor = GetXrFormFactor(FormFactor);
         Parsed.ViewConfigType = GetXrViewConfigurationType(ViewConfiguration);
         if (!EnvironmentBlendMode.empty()) {

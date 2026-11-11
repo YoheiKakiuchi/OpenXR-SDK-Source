@@ -44,7 +44,6 @@ set(LOCAL_SOURCE
     logger.cpp
     main.cpp
     openxr_program.cpp
-    openxr_program_spatial_containers.cpp
     pch.cpp
     platformplugin_android.cpp
     platformplugin_factory.cpp

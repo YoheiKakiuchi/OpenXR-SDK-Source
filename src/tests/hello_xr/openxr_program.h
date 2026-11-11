@@ -27,7 +27,7 @@ struct IOpenXrProgram {
     // Process any events in the event queue.
     virtual void PollEvents(bool* exitRenderLoop, bool* requestRestart) = 0;
 
-    // Manage session lifecycle to track if RenderFrame should be called.
+    // Manage session lifecycle to track if ProcessFrame should be called.
     virtual bool IsSessionRunning() const = 0;
 
     // Manage session state to track if input should be processed.
@@ -36,8 +36,8 @@ struct IOpenXrProgram {
     // Sample input actions and generate haptic feedback.
     virtual void PollActions() = 0;
 
-    // Create and submit a frame.
-    virtual void RenderFrame() = 0;
+    // Poll tracking and input for one frame.
+    virtual void ProcessFrame() = 0;
 
     // Query the appropriate clear color based on the environment (blend mode)
     virtual std::array<float, 4> GetBackgroundClearColor() const = 0;
