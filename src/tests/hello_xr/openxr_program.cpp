@@ -982,22 +982,7 @@ struct OpenXrProgram : IOpenXrProgram {
             depthInfos.resize(viewCountOutput);
         }
 
-        // For each locatable space that we want to visualize, render a 25cm cube.
         std::vector<Cube> cubes;
-
-        for (XrSpace visualizedSpace : m_visualizedSpaces) {
-            XrSpaceLocation spaceLocation{XR_TYPE_SPACE_LOCATION};
-            res = xrLocateSpace(visualizedSpace, m_appSpace, predictedDisplayTime, &spaceLocation);
-            CHECK_XRRESULT(res, "xrLocateSpace");
-            if (XR_UNQUALIFIED_SUCCESS(res)) {
-                if ((spaceLocation.locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT) != 0 &&
-                    (spaceLocation.locationFlags & XR_SPACE_LOCATION_ORIENTATION_VALID_BIT) != 0) {
-                    cubes.push_back(Cube{spaceLocation.pose, {0.25f, 0.25f, 0.25f}});
-                }
-            } else {
-                Log::Write(Log::Level::Verbose, Fmt("Unable to locate a visualized reference space in app space: %d", res));
-            }
-        }
 
         // Render a 10cm cube scaled by grabAction for each hand. Note renderHand will only be
         // true when the application has focus.
