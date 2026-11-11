@@ -18,8 +18,6 @@
 set(LOCAL_HEADERS
     check.h
     common.h
-    d3d_common.h
-    d3d12_utils.h
     geometry.h
     graphicsplugin.h
     logger.h
@@ -29,29 +27,50 @@ set(LOCAL_HEADERS
     platformdata.h
     platformplugin.h
     swapchain_image_data.h
-    vulkan_utils.h
 )
 set(LOCAL_SOURCE
-    d3d_common.cpp
-    d3d12_utils.cpp
-    graphicsplugin_d3d11.cpp
-    graphicsplugin_d3d12.cpp
     graphicsplugin_factory.cpp
-    graphicsplugin_opengl.cpp
-    graphicsplugin_opengles.cpp
-    graphicsplugin_vulkan.cpp
-    graphicsplugin_metal.cpp
     logger.cpp
     main.cpp
     openxr_program.cpp
-    pch.cpp
-    platformplugin_android.cpp
     platformplugin_factory.cpp
-    platformplugin_posix.cpp
-    platformplugin_win32.cpp
     swapchain_image_data.cpp
 )
-set(VULKAN_SHADERS vulkan_shaders/frag.glsl vulkan_shaders/vert.glsl)
+
+if(ANDROID)
+    list(APPEND LOCAL_SOURCE platformplugin_android.cpp)
+elseif(WIN32)
+    list(APPEND LOCAL_SOURCE platformplugin_win32.cpp)
+else()
+    list(APPEND LOCAL_SOURCE platformplugin_posix.cpp)
+endif()
+
+if(XR_USE_GRAPHICS_API_D3D11 OR XR_USE_GRAPHICS_API_D3D12)
+    list(APPEND LOCAL_SOURCE d3d_common.cpp)
+    list(APPEND LOCAL_HEADERS d3d_common.h)
+endif()
+if(XR_USE_GRAPHICS_API_D3D11)
+    list(APPEND LOCAL_SOURCE graphicsplugin_d3d11.cpp)
+endif()
+if(XR_USE_GRAPHICS_API_D3D12)
+    list(APPEND LOCAL_SOURCE d3d12_utils.cpp graphicsplugin_d3d12.cpp)
+    list(APPEND LOCAL_HEADERS d3d12_utils.h)
+endif()
+if(XR_USE_GRAPHICS_API_OPENGL)
+    list(APPEND LOCAL_SOURCE graphicsplugin_opengl.cpp)
+endif()
+if(XR_USE_GRAPHICS_API_OPENGL_ES)
+    list(APPEND LOCAL_SOURCE graphicsplugin_opengles.cpp)
+endif()
+set(VULKAN_SHADERS)
+if(XR_USE_GRAPHICS_API_VULKAN)
+    list(APPEND LOCAL_SOURCE graphicsplugin_vulkan.cpp)
+    list(APPEND LOCAL_HEADERS vulkan_utils.h)
+    set(VULKAN_SHADERS vulkan_shaders/frag.glsl vulkan_shaders/vert.glsl)
+endif()
+if(XR_USE_GRAPHICS_API_METAL)
+    list(APPEND LOCAL_SOURCE graphicsplugin_metal.cpp)
+endif()
 
 if(ANDROID)
     add_library(
@@ -96,40 +115,39 @@ else()
     add_sanitizers(hello_xr)
 endif()
 
-if(APPLE)
+if(XR_USE_GRAPHICS_API_METAL)
     # use C++17 since there is a dependency on metal-cpp
     target_compile_features(hello_xr PUBLIC cxx_std_17)
 endif()
 
 set_target_properties(hello_xr PROPERTIES FOLDER ${SAMPLES_FOLDER})
 source_group("Headers" FILES ${LOCAL_HEADERS})
-source_group("Shaders" FILES ${VULKAN_SHADERS})
 
 target_link_libraries(hello_xr PRIVATE OpenXR::openxr_loader)
-
-compile_glsl(run_hello_xr_glsl_compiles ${VULKAN_SHADERS})
-
-add_dependencies(hello_xr run_hello_xr_glsl_compiles)
 
 target_include_directories(
     hello_xr
     PRIVATE
         "${PROJECT_SOURCE_DIR}/src"
         "${PROJECT_SOURCE_DIR}/src/common"
-        "${PROJECT_SOURCE_DIR}/src/external/metal-cpp"
-        # For including compiled shaders
-        "${CMAKE_CURRENT_BINARY_DIR}"
         # Backport of std::span functionality to pre-C++17
         ${PROJECT_SOURCE_DIR}/src/external/span-lite/include
 )
 
-target_link_libraries(hello_xr PRIVATE OpenXR::openxr_loader)
-
-if(GLSLANG_VALIDATOR AND NOT GLSLC_COMMAND)
-    target_compile_definitions(hello_xr PRIVATE USE_GLSLANGVALIDATOR)
+if(XR_USE_GRAPHICS_API_METAL)
+    target_include_directories(hello_xr PRIVATE "${PROJECT_SOURCE_DIR}/src/external/metal-cpp")
 endif()
 
 if(XR_USE_GRAPHICS_API_VULKAN)
+    source_group("Shaders" FILES ${VULKAN_SHADERS})
+    target_include_directories(hello_xr PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
+    compile_glsl(run_hello_xr_glsl_compiles ${VULKAN_SHADERS})
+    add_dependencies(hello_xr run_hello_xr_glsl_compiles)
+
+    if(GLSLANG_VALIDATOR AND NOT GLSLC_COMMAND)
+        target_compile_definitions(hello_xr PRIVATE USE_GLSLANGVALIDATOR)
+    endif()
+
     target_include_directories(hello_xr PRIVATE ${Vulkan_INCLUDE_DIRS})
     target_link_libraries(hello_xr PRIVATE ${Vulkan_LIBRARY})
 endif()
@@ -151,19 +169,16 @@ if(WIN32)
             target_compile_options(openxr_c_compile_test PRIVATE /WX)
         endif()
 
-        # Right now can't build d3d features on MinGW because of directxcolors, directxmath, etc.
-        target_link_libraries(
-            hello_xr
-            PRIVATE
-                d3d11
-                d3d12
-                d3dcompiler
-                dxgi
-        )
+        if(XR_USE_GRAPHICS_API_D3D11)
+            target_link_libraries(hello_xr PRIVATE d3d11 d3dcompiler dxgi)
+        endif()
+        if(XR_USE_GRAPHICS_API_D3D12)
+            target_link_libraries(hello_xr PRIVATE d3d12 d3dcompiler dxgi)
+        endif()
     endif()
 endif()
 
-if(APPLE)
+if(XR_USE_GRAPHICS_API_METAL)
     target_link_libraries(
         hello_xr PRIVATE "-framework Foundation" "-framework CoreGraphics"
                          "-framework Metal"
